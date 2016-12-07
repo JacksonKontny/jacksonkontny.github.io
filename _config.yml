@@ -18,16 +18,16 @@ avatar: https://raw.githubusercontent.com/barryclark/jekyll-now/master/images/je
 # Includes an icon in the footer for each username you enter
 footer-links:
   dribbble:
-  email:
-  facebook:
+  email: jackson.kontny@gmail.com
+  facebook: https://www.facebook.com/jackson.kontny
   flickr:
-  github: jacksonkontny/jekyll-now
+  github: jacksonkontny/jacksonkontny.github.io
   instagram:
-  linkedin:
+  linkedin: https://www.linkedin.com/in/jacksonmkontny
   pinterest:
   rss: # just type anything here for a working RSS icon
-  twitter: jkontny
-  stackoverflow: # your stackoverflow profile, e.g. "users/50476/bart-kiers"
+  twitter: https://twitter.com/JKontny
+  stackoverflow: users/3830504/jkontny 
   youtube: # channel/<your_long_string> or user/<user-name>
   googleplus: # anything in your profile username that comes after plus.google.com/
 
@@ -41,7 +41,7 @@ google_analytics:
 
 # Your website URL (e.g. http://barryclark.github.io or http://www.barryclark.co)
 # Used for Sitemap.xml and your RSS feed
-url:
+url: http://jacksonkontny.github.io
 
 # If you're hosting your site at a Project repository on GitHub pages
 # (http://yourusername.github.io/repository-name)
