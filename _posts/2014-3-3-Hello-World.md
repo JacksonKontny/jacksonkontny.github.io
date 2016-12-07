@@ -1,10 +1,13 @@
 ---
 layout: post
-title: You're up and running!
+title: Backend Development, Machine Learning, Fun
 ---
 
-Next you can update your site name, avatar and other options using the _config.yml file in the root of your repository (shown below).
+Welcome! How's it going? What brought you here? If you're looking for a blog with some musings and projects related to ML and Backend Development, look no further, you have arrived!
 
 ![_config.yml]({{ site.baseurl }}/images/config.png)
 
-The easiest way to make your first post is to edit this one. Go into /_posts/ and update the Hello World markdown file. For more instructions head over to the [Jekyll Now repository](https://github.com/barryclark/jekyll-now) on GitHub.
+Before you delve further into this page, ask yourself a few questions:
+
+1. Why are you here?
+2. Seriously, this page is at its infancy.  If you are here for any other reason than you are looking for jekyll examples, you might want to come back when the content has matured.
