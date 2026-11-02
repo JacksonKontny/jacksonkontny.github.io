@@ -1,0 +1,123 @@
+/* Page-specific styles for the prefix-sums explainer. Uses kit tokens only.
+   Colour language (shared with every widget on the page):
+     input values   neutral cells (--surface-2 / --ink)
+     being added    --c4 (amber) highlight
+     p[j+1] / A     --c1      p[i] / B   --c2      range / result   --c3
+     unchanged      dimmed (opacity .35) */
+
+.d-main .pg-col { max-width: 100%; }
+.pg-c1 { color: var(--c1); }
+.pg-c2 { color: var(--c2); }
+
+/* reserved heights for widget mounts (no jump when they load) */
+.pg-mount-range { min-height: 510px; margin: var(--sp-4) 0; }
+.pg-mount-hillis { min-height: 520px; margin: var(--sp-4) 0; }
+.pg-mount-blelloch { min-height: 720px; margin: var(--sp-4) 0; }
+.pg-mount-race { min-height: 340px; margin: var(--sp-4) 0; }
+@media (min-width: 600px) {
+  .pg-mount-range { min-height: 440px; }
+  .pg-mount-hillis { min-height: 490px; }
+  .pg-mount-blelloch { min-height: 775px; }
+  .pg-mount-race { min-height: 280px; }
+}
+
+/* small figures */
+.d-main .pg-fig-narrow { max-width: min(100%, 520px); }
+.pg-fig-kicker { font: 600 var(--fs-caption)/var(--lh-caption) var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+.pg-live { font: 0.875rem/1.375rem var(--font-mono); color: var(--ink); margin: var(--sp-1) 0 0 !important; min-height: 3rem; font-variant-numeric: tabular-nums; }
+
+.pg-formula { font: 600 1.125rem/1.5 var(--font-mono); text-align: center; padding: var(--sp-2); background: var(--surface-2); border-radius: var(--radius-2); overflow-wrap: anywhere; }
+.pg-rule { padding: var(--sp-2) var(--sp-3); border-left: 4px solid var(--c4); background: var(--surface-2); border-radius: 0 var(--radius-2) var(--radius-2) 0; font-family: var(--font-sans); font-size: var(--fs-small); line-height: var(--lh-small); }
+
+/* f-build svg */
+#f-build .bld-cell { fill: var(--surface-2); stroke: var(--line); stroke-width: 1; }
+#f-build .bld-val { font: 600 16px var(--font-mono); fill: var(--ink); }
+#f-build .bld-lab { font: 500 14px var(--font-mono); fill: var(--ink-3); }
+#f-build .bld-tick { stroke: var(--ink-4); stroke-width: 1; stroke-dasharray: 3 3; }
+#f-build .bld-bracket-line { fill: none; stroke: var(--c3); stroke-width: 2; stroke-linejoin: round; }
+#f-build .bld-c3 { fill: var(--c3); font: 650 14px var(--font-sans); }
+#f-build .bld-result-box { fill: var(--c3-soft); stroke: var(--c3); stroke-width: 1.5; }
+#f-build .bld-result-text { font: 650 15px var(--font-mono); fill: var(--ink); }
+#f-build .is-c1 .bld-cell { stroke: var(--c1); stroke-width: 2; fill: var(--c1-soft); }
+#f-build .is-c2 .bld-cell { stroke: var(--c2); stroke-width: 2; fill: var(--c2-soft); }
+#f-build .is-adding .bld-cell { stroke: var(--c4); stroke-width: 2.5; fill: var(--c4-soft); }
+#f-build .is-range .bld-cell { stroke: var(--c3); stroke-width: 1.5; }
+#f-build svg g, #f-build svg path.d-arrow { transition: opacity var(--dur-2) ease; }
+#f-build .is-hidden { opacity: 0; }
+
+/* plain cell rows (input array, compare figure, k-07 data) */
+.pg-cells { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 4px; max-width: 440px; margin: 0 0 var(--sp-3); font: 600 15px/1 var(--font-mono); font-variant-numeric: tabular-nums; }
+.pg-cells > span { display: flex; align-items: center; justify-content: center; height: 40px; background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius-1); color: var(--ink); }
+.pg-cells-9 { grid-template-columns: repeat(9, minmax(0, 1fr)); max-width: 500px; margin-bottom: var(--sp-2); }
+.pg-cells .pg-saved { border: 2px dashed var(--c1); background: var(--c1-soft); }
+.pg-cells-prefix > span { border-color: var(--c3); }
+.pg-compare-label { font: 500 var(--fs-caption)/var(--lh-caption) var(--font-sans); color: var(--ink-3); margin-bottom: var(--sp-half); }
+.pg-cells-idx { margin-bottom: var(--sp-5); }
+.pg-cells-idx > span { position: relative; }
+.pg-cells-idx > span::after { content: attr(data-i); position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 4px; font: 500 11px/1.2 var(--font-mono); color: var(--ink-3); white-space: nowrap; }
+.pg-cells-idx > span.pg-saved::after { content: "p[8]"; color: var(--c1); }
+.pg-cells-idx > span.pg-saved::before { content: "(saved)"; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 18px; font: 500 11px/1.2 var(--font-mono); color: var(--c1); white-space: nowrap; }
+.pg-check-data { margin-bottom: var(--sp-2); }
+
+/* f-simd: two panels, side by side when there's room, stacked otherwise */
+.pg-pair { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0 var(--sp-3); }
+@media (min-width: 760px) { .pg-pair { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+.pg-pair-item { margin: var(--sp-2) 0; }
+.pg-code { margin: 0 0 var(--sp-1); font: 600 var(--fs-small)/var(--lh-small) var(--font-mono); }
+.pg-code code { background: none !important; padding: 0 !important; }
+.pg-simd .cell { fill: var(--surface-2); stroke: var(--line); stroke-width: 1; }
+.pg-simd .val { font: 600 15px var(--font-mono); fill: var(--ink); }
+.pg-simd .lab { font: 500 14px var(--font-mono); fill: var(--ink-3); }
+.pg-simd .op { fill: var(--c4-soft); stroke: var(--c4); stroke-width: 2; }
+.pg-simd .op-text { font: 650 14px var(--font-sans); fill: var(--ink); }
+.pg-simd .wire { stroke: var(--ink-4); stroke-width: 1; }
+.pg-simd .sum { fill: var(--c3-soft); stroke: var(--c3); stroke-width: 1.5; }
+.pg-simd .note { font: 650 14px var(--font-sans); fill: var(--ink-2); }
+.pg-simd .step-lab { font: 600 13px var(--font-mono); fill: var(--c4); }
+
+/* work table */
+.pg-table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius-2); background: var(--surface); }
+.pg-table { border-collapse: collapse; width: 100%; min-width: 420px; font: var(--fs-small)/var(--lh-small) var(--font-sans); font-variant-numeric: tabular-nums; }
+.pg-table th, .pg-table td { padding: var(--sp-1) var(--sp-2); text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.pg-table thead th { font: 600 var(--fs-caption)/var(--lh-caption) var(--font-mono); text-transform: uppercase; letter-spacing: .04em; color: var(--ink-3); }
+.pg-table tbody th { font-family: var(--font-mono); font-weight: 600; color: var(--ink-2); }
+.pg-table tbody tr:last-child > * { border-bottom: 0; }
+.pg-table th:first-child { text-align: left; }
+
+/* gated content: visible without JS; with JS, hidden until its check is committed */
+[data-reveal-after] .pg-gated-note { display: none; }
+[data-reveal-after].is-gated:not(.is-open) .pg-gated-body { display: none; }
+[data-reveal-after].is-gated:not(.is-open) .pg-gated-note { display: block; font: italic var(--fs-small)/var(--lh-small) var(--font-sans); color: var(--ink-3); }
+
+/* checks: feedback lead + reveal button */
+.pg-fb-lead { font-weight: 650; color: var(--ink); margin-bottom: var(--sp-1) !important; }
+.d-feedback p { margin: 0 0 var(--sp-1); }
+.d-feedback p:last-child { margin-bottom: 0; }
+.d-option[aria-disabled="true"] { cursor: default; }
+.d-check .pg-reveal { min-height: var(--tap); }
+
+/* recap and sources */
+.pg-recap, .pg-sources { padding-left: 1.25em; }
+.pg-recap li, .pg-sources li { margin-bottom: var(--sp-1); }
+.pg-sources { font: var(--fs-small)/var(--lh-small) var(--font-sans); color: var(--ink-2); }
+.pg-sources a { overflow-wrap: anywhere; }
+
+@media (max-width: 599px) {
+  #f-build .d-canvas, #f-simd .d-canvas { padding: var(--sp-1); }
+}
+
+/* work table: fit 4 columns on phones */
+.pg-short { display: none; }
+@media (max-width: 599px) {
+  .pg-long { display: none; }
+  .pg-short { display: inline; }
+  .pg-table { min-width: 0; }
+  .pg-table th, .pg-table td { padding: var(--sp-1) 6px; }
+  .pg-table thead th { letter-spacing: 0; }
+}
+
+/* touch targets ≥ 44px on touch widths */
+@media (max-width: 899px), (pointer: coarse) {
+  .d-replay, .d-more > summary { min-height: var(--tap); }
+  .d-toc-mobile a { min-height: var(--tap); display: flex; align-items: center; }
+}

@@ -1,0 +1,59 @@
+/* w-hillis: scoped to the mount. Tokens only. */
+[data-widget="w-hillis"] .wh-frame { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-2); padding: var(--sp-2); font-family: var(--font-sans); }
+@media (max-width: 599px) { [data-widget="w-hillis"] .wh-frame { padding: var(--sp-2) var(--sp-1); } }
+[data-widget="w-hillis"] .wh-svg { display: block; max-width: 100%; overflow: visible; }
+
+/* text on the canvas */
+[data-widget="w-hillis"] .wh-tag { font: 500 12px/1 var(--font-sans); fill: var(--ink-3); font-style: italic; }
+[data-widget="w-hillis"] .wh-idx { font: 500 12px/1 var(--font-mono); fill: var(--ink-3); }
+[data-widget="w-hillis"] .wh-num { font: 600 16px/1 var(--font-mono); font-variant-numeric: tabular-nums; fill: var(--ink); }
+[data-widget="w-hillis"] .is-narrow .wh-num { font-size: 14px; }
+[data-widget="w-hillis"] .wh-l1 { font: 650 13px/1 var(--font-sans); fill: var(--ink-2); }
+[data-widget="w-hillis"] .wh-l2 { font: 500 12px/1 var(--font-sans); fill: var(--ink-3); }
+[data-widget="w-hillis"] .wh-lab.is-active .wh-l1 { fill: var(--ink); }
+[data-widget="w-hillis"] .wh-lab.is-active .wh-l2 { fill: var(--ink); font-weight: 650; }
+[data-widget="w-hillis"] .wh-lab.is-ghost { opacity: .35; }
+[data-widget="w-hillis"] .wh-rw { font: 500 12px/1 var(--font-sans); fill: var(--ink-3); }
+[data-widget="w-hillis"] .wh-final { font: 700 13px/1 var(--font-mono); fill: var(--c3); }
+
+/* cells */
+[data-widget="w-hillis"] .wh-cell { fill: var(--surface-2); stroke: var(--line); stroke-width: 1px; }
+[data-widget="w-hillis"] .wh-row.is-active .wh-cell.is-changed { fill: var(--c4-soft); stroke: var(--c4); stroke-width: 2px; }
+[data-widget="w-hillis"] .wh-row.is-active .wh-cell.is-copied { opacity: .45; }
+[data-widget="w-hillis"] .wh-row.is-active .wh-num.is-copied { opacity: .45; }
+[data-widget="w-hillis"] .wh-bracket { fill: none; stroke: var(--c3); stroke-width: 2px; stroke-linejoin: round; }
+[data-widget="w-hillis"] .wh-row.is-read .wh-cell { stroke: var(--ink-4); }
+[data-widget="w-hillis"] .wh-row.is-dim { opacity: .35; }
+[data-widget="w-hillis"] .wh-row.is-ghost .wh-cell { fill: none; stroke: var(--line); stroke-dasharray: 3 3; }
+
+/* arrows */
+[data-widget="w-hillis"] .wh-arr { stroke-width: 2px; stroke-linecap: round; fill: none; }
+[data-widget="w-hillis"] .wh-arrows.is-active .wh-arr { stroke: var(--c4); }
+[data-widget="w-hillis"] .wh-arrows.is-dim .wh-arr { stroke: var(--ink-4); }
+[data-widget="w-hillis"] .wh-arrows.is-dim { opacity: .45; }
+[data-widget="w-hillis"] .wh-copy { stroke: var(--ink-4); stroke-width: 1px; stroke-dasharray: 2 3; }
+[data-widget="w-hillis"] .wh-head { fill: var(--c4); }
+[data-widget="w-hillis"] .wh-head-dim { fill: var(--ink-4); }
+
+/* one-shot entrance when a step is taken (fades only; durations are 0 under reduced motion) */
+[data-widget="w-hillis"] .wh-arrows.is-anim { animation: wh-fade var(--dur-2) var(--ease-out) both; }
+[data-widget="w-hillis"] .wh-row.is-anim { animation: wh-fade var(--dur-2) var(--ease-out) var(--dur-1) both; }
+@keyframes wh-fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* controls */
+[data-widget="w-hillis"] .wh-controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-2); margin-top: var(--sp-2); }
+[data-widget="w-hillis"] .wh-btns { display: flex; gap: var(--sp-1); }
+[data-widget="w-hillis"] .wh-btn { font: 600 var(--fs-small)/1 var(--font-sans); min-height: var(--tap); min-width: var(--tap); padding: 0 var(--sp-2);
+  border-radius: var(--radius-2); border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
+[data-widget="w-hillis"] .wh-btn:hover:not(:disabled) { border-color: var(--ink-4); }
+[data-widget="w-hillis"] .wh-btn.wh-primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+[data-widget="w-hillis"] .wh-btn:disabled { opacity: .4; cursor: default; }
+[data-widget="w-hillis"] .wh-btn:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+[data-widget="w-hillis"] .wh-count { font: 600 var(--fs-small)/var(--lh-small) var(--font-mono); color: var(--ink-2); }
+[data-widget="w-hillis"] .wh-tally { margin: var(--sp-1) 0 0; min-height: var(--lh-small); font: var(--fs-small)/var(--lh-small) var(--font-mono); font-variant-numeric: tabular-nums; color: var(--ink); }
+[data-widget="w-hillis"] .wh-muted { color: var(--ink-3); }
+[data-widget="w-hillis"] .wh-nw { white-space: nowrap; }
+/* the live sentence is for screen readers; the same facts are on the canvas and in the tally */
+[data-widget="w-hillis"] .wh-live { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+/* narrow: the final tally wraps to two lines; reserve them from step 0 so the widget never grows */
+[data-widget="w-hillis"] .wh-frame.is-narrow .wh-tally { min-height: calc(2 * var(--lh-small)); }

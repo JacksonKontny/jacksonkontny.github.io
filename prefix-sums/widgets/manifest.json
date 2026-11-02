@@ -1,0 +1,48 @@
+{
+  "data_origins": [],
+  "colour_language": "Shared by every figure and widget: input values = neutral cells (--surface-2 fill, --ink text); cells currently being added / active pair = --c4 highlight; unchanged context dimmed (opacity .35); range or result = --c3; p[j+1] = --c1; p[i] = --c2. Saved total = dashed --c1 border.",
+  "widgets": {
+    "w-range": {
+      "segment": "s-02",
+      "complexity": "low",
+      "mount": "[data-widget=\"w-range\"]",
+      "size": { "desktop": "720×360 (column width)", "mobile": "100%×400, formula line wraps under the bars" },
+      "files": ["index.js", "index.css"],
+      "cdn": [],
+      "data_origins": []
+    },
+    "w-hillis": {
+      "segment": "s-04",
+      "complexity": "high",
+      "mount": "[data-widget=\"w-hillis\"]",
+      "size": { "desktop": "720×360 (column width, incl. controls)", "mobile": "100%×400, ~41px cells, controls below the canvas" },
+      "files": ["index.js", "index.css"],
+      "cdn": [],
+      "data_origins": [],
+      "notes": "Page prose before the mount states the rule (offset doubles 1, 2, 4; a cell with nothing that far left keeps its value) and the two-buffer reason; k-04 follows directly after the mount. Don't restate the rule at length inside the widget; the per-step label and tally belong on the canvas."
+    },
+    "w-blelloch": {
+      "segment": "s-05",
+      "complexity": "high",
+      "mount": "[data-widget=\"w-blelloch\"]",
+      "size": { "desktop": "720×560 (column width, incl. controls)", "mobile": "100%×600, phase labels above rows, controls below the canvas" },
+      "files": ["index.js", "index.css"],
+      "cdn": [],
+      "data_origins": [],
+      "gates": {
+        "k-05": "The page renders k-05 as .d-check[data-check=\"k-05\"][data-check-host=\"w-blelloch\"] directly after this mount (assets/checks.js handles commit and feedback). To show it inside the widget frame before stage 7, move that DOM node into the widget (it keeps working wherever it lives). Unlock stage 7 when window.Didactician.checks['k-05'] is set, or on document event 'didactician:check' with detail.id === 'k-05' (check both: the reader may answer before reaching stage 7). The page also hides its post-widget paragraph and the output/prefix comparison until k-05 is committed."
+      },
+      "notes": "Page prose before the mount explains each phase's purpose (up-sweep, clear, down-sweep) once; the per-stage rule and numbers belong on the canvas."
+    },
+    "w-race": {
+      "segment": "s-06",
+      "complexity": "low",
+      "mount": "[data-widget=\"w-race\"]",
+      "size": { "desktop": "720×280 (column width)", "mobile": "100%×340+, button groups wrap below the bars" },
+      "files": ["index.js", "index.css"],
+      "cdn": [],
+      "data_origins": [],
+      "gates": { "k-06": "Shows a locked panel with no numbers until k-06 is committed." }
+    }
+  }
+}
