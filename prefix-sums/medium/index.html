@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prefix sums, from O(1) range queries to parallel scans</title>
+<meta name="description" content="Why sum(i..j) = prefix[j+1] − prefix[i] works, why a running sum resists SIMD, and how the Hillis-Steele and Blelloch scans build the prefix array in parallel. Traced by hand on eight numbers.">
+<style>
+  :root { --ink: #1d1c1a; --muted: #6b6860; --bg: #fdfcf9; --rule: #e6e3da; --accent: #2f5bd3; }
+  @media (prefers-color-scheme: dark) { :root { --ink: #ece9e2; --muted: #a6a29a; --bg: #181816; --rule: #34332f; --accent: #8aa6f0; } }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 18px/1.65 Georgia, "Times New Roman", serif; }
+  article { max-width: 680px; margin: 0 auto; padding: 40px 16px 80px; }
+  h1 { font-size: 2.1rem; line-height: 1.2; margin: 0 0 12px; }
+  h2 { font-size: 1.5rem; margin: 2.2em 0 .4em; }
+  h3 { font-size: 1.2rem; margin: 1.8em 0 .4em; }
+  a { color: var(--accent); }
+  figure { margin: 1.6em 0; }
+  img { display: block; max-width: 100%; height: auto; border-radius: 6px; }
+  figcaption { color: var(--muted); font-size: .85rem; margin-top: .5em; }
+  code, pre { font-family: Menlo, Consolas, monospace; font-size: .85em; }
+  pre { background: rgba(127,127,127,.1); padding: 12px 14px; overflow-x: auto; border-radius: 6px; }
+  blockquote { margin: 1.4em 0; padding-left: 16px; border-left: 3px solid var(--ink); }
+  hr { border: 0; text-align: center; margin: 2em 0; }
+  hr::before { content: "· · ·"; color: var(--muted); letter-spacing: .5em; }
+</style>
+</head>
+<body>
+<article>
+
+<h1>Prefix sums, from O(1) range queries to parallel scans</h1>
+<p><em>One row of running totals answers any range-sum question with a single subtraction. Building that row looks stubbornly sequential, yet SIMD units and GPUs build it in parallel. Here is how both halves work, traced by hand on eight numbers.</em></p>
+<p>This is the static version of an interactive explainer. The <a href="https://jacksonkontny.github.io/prefix-sums/">interactive version</a> lets you drag ranges, step through both parallel scans one add at a time, and answer the quick checks as you go.</p>
+
+<h2>The question: the sum of any slice, asked many times</h2>
+<p>Say a program holds an array <em>a</em> of n numbers and keeps asking the same kind of question: what is the sum of a[i..j]? Not once, but thousands of times, for thousands of different (i, j) pairs. Adding up the slice each time costs O(n) per question, so Q questions cost O(n·Q).</p>
+<p>There is a better deal. Spend one pass building a second row: a running total that starts at 0 and adds each element in turn. Here it is for a five-element array.</p>
+
+<figure>
+  <img src="https://jacksonkontny.github.io/prefix-sums/medium/img/build.png" alt="The array 5, 2, 8, 1, 6 above its running total 0, 5, 7, 15, 16, 22, drawn on the boundaries between elements. sum(1..3) = p[4] − p[1] = 16 − 5 = 11, the same as 2 + 8 + 1." width="520">
+  <figcaption>Build once in O(n); after that, every slice sum is one subtraction, however long the slice.</figcaption>
+</figure>
+
+<p>Each number in the bottom row sits on a boundary between elements, because it is the total of <em>everything before</em> that boundary. So the sum of a[1..3] is the total before index 4 minus the total before index 1: 16 − 5 = 11, the same as adding 2, 8 and 1 one by one. A slice of three elements and a slice of three thousand cost the same: one subtraction.</p>
+<p>That bottom row is a <strong>prefix-sum array</strong>. If you have ever called <code>cumsum</code>, you have built something very close to one; the small difference matters, as the first check below shows.</p>
+
+<h2>Why the subtraction always works</h2>
+<p>From here on, one slightly longer array runs through every figure: <strong>[3, 1, 7, 0, 4, 1, 6, 3]</strong>.</p>
+<p>Read <code>prefix[k]</code> as “the sum of everything before index k”. Then <code>prefix[0]</code> is the sum of nothing, which is 0, and <code>prefix[8]</code> is the sum of the whole array. That reading is why the array has n + 1 entries for n values: there are n + 1 places to stand, one before each element and one after the last.</p>
+<p>Now take any range from i to j, inclusive and 0-indexed. “Everything before j + 1” contains the range plus everything before i. “Everything before i” contains just that front part. Subtract, and the front part cancels, because it is in both. What is left is exactly the range:</p>
+<blockquote><strong>sum(i..j) = prefix[j+1] − prefix[i]</strong></blockquote>
+<p>The algebra is a telescoping sum: prefix[j+1] − prefix[i] = (a₀ + a₁ + … + aⱼ) − (a₀ + … + aᵢ₋₁) = aᵢ + … + aⱼ. Every term from a₀ to aᵢ₋₁ appears once with a plus and once with a minus, so they cancel in pairs. When i = 0 the second bracket is empty and equals prefix[0] = 0.</p>
+
+<figure>
+  <img src="https://jacksonkontny.github.io/prefix-sums/medium/img/range.png" alt="Range 2..5 of [3, 1, 7, 0, 4, 1, 6, 3]. p[6] = 16 is everything before index 6; p[2] = 4 is everything before index 2; the shared part a[0..1] cancels, leaving 16 − 4 = 12 = 7 + 0 + 4 + 1." width="660">
+  <figcaption>sum(2..5): both prefix entries contain a[0..1], so it cancels. (Drag i and j in the interactive version.)</figcaption>
+</figure>
+
+<h3>Quick check 1 (predict)</h3>
+<p>NumPy’s <code>np.cumsum</code> on the first figure’s array [5, 2, 8, 1, 6] returns c = [5, 7, 15, 16, 22], same length, no leading 0. A colleague computes sum(1..3) as <code>c[3] − c[1]</code>. What do they get?</p>
+<ul>
+  <li>A. 11, the right answer</li>
+  <li>B. 9</li>
+  <li>C. 16</li>
+  <li>D. It raises an IndexError</li>
+</ul>
+<p><em>Pick one before reading on.</em></p>
+<p><strong>Answer: B.</strong> c[3] − c[1] = 16 − 7 = 9, which is 8 + 1: it silently drops a[1], because c[1] already <em>includes</em> a[1]. That is the trap in treating cumsum’s output as the prefix array. With cumsum you would need c[3] − c[0], and a range starting at index 0 would need a special case, since c[−1] does not mean “nothing”. Prepending a 0 (prefix = [0, *cumsum]) gives n + 1 entries where prefix[k] means “everything before k”, and the one formula prefix[j+1] − prefix[i] covers every range, including i = 0.</p>
+
+<hr>
+
+<p>Here is the trade. You pay O(n) time and O(n) extra memory once, to build the array. After that, every range sum costs O(1), so Q queries cost O(n + Q) instead of O(n·Q). The catch: the array has to stay put. Change one value and every prefix after it is stale, so you rebuild in O(n).</p>
+
+<h3>Quick check 2 (apply)</h3>
+<p>Running max works as a running total too: for a = [5, 1, 2] the prefix-max is [−∞, 5, 5, 5]. Can you get the max of a[1..2] from two prefix-max entries the way subtraction does for sums?</p>
+<ul>
+  <li>A. Yes: combine pmax[3] and pmax[1]</li>
+  <li>B. No: there’s no way to “un-max”</li>
+  <li>C. Only if the array is sorted</li>
+</ul>
+<p><em>Pick one before reading on.</em></p>
+<p><strong>Answer: B.</strong> The max of a[1..2] is 2, but the entries you would use are both 5, and nothing you do to 5 and 5 can produce 2. It is tempting to think the trick carries over to any operation you can run as a running total, but subtraction works only because it <em>undoes</em> addition, and max has no undo. Xor does have one (x xor x = 0), so prefix-xor ranges work: for [5, 3, 6] the prefix-xor is [0, 5, 6, 0], and 3 xor 6 = 5 = p[3] xor p[1]. So a scan needs only associativity (to be parallelized); the range-query trick also needs an inverse.</p>
+
+<h2>The loop that won’t vectorize</h2>
+<p>Building the prefix array is a loop of n additions, and loops of additions are usually the easiest thing in the world to speed up, thanks to <strong>SIMD</strong>: single instruction, multiple data. One instruction operates on several values at once. An AVX register is 256 bits wide and holds eight 32-bit floats, so one vector add performs eight additions (AVX2 does the same for eight 32-bit integers). Each slot in the register is a <strong>lane</strong>. GPUs push the idea further: NVIDIA GPUs run threads in groups of 32, called warps, that execute the same instruction together, a scheme NVIDIA calls SIMT (single instruction, multiple threads).</p>
+<p>Here are two loops that look almost the same:</p>
+<pre>c[k] = a[k] + b[k]        # independent adds
+s[k] = s[k−1] + a[k]      # each add waits on the last</pre>
+
+<figure>
+  <img src="https://jacksonkontny.github.io/prefix-sums/medium/img/simd.png" alt="Top: rows a and b of eight lanes feed one vector-add instruction, producing eight sums in one step. Bottom: the running sum 3, 4, 11, 11, 15, 16, 22, 25 as a staircase, seven adds one after another." width="520">
+  <figcaption>Top: one instruction, eight adds, no lane waits for another. Bottom: seven adds, each waiting on the last.</figcaption>
+</figure>
+
+<p>The first loop is a perfect fit for eight lanes, because its additions don’t depend on each other. The second isn’t: s[k] needs s[k−1], which needs s[k−2], all the way back to the start. One lane works while the other seven sit idle.</p>
+
+<h3>Quick check 3 (think, then read on)</h3>
+<p>The loop <code>s[k] = s[k−1] + a[k]</code> makes every add wait for the previous one, so 8 lanes sit idle. Think of a way to use 8 lanes to get just the <em>total</em> of [3, 1, 7, 0, 4, 1, 6, 3] in fewer than 7 rounds.</p>
+<p><em>Think about it before reading on.</em></p>
+<p><strong>Answer.</strong> Add neighbours in pairs, all at once: (3+1), (7+0), (4+1), (6+3) gives 4, 7, 5, 9. Then pairs of those: 11, 14. Then 25. Three rounds instead of seven. This works only because addition is associative: the grouping can change without changing the result. The pairwise tree is exactly the first half of Blelloch’s algorithm, coming up shortly. The obvious loop’s dependency is real, but it belongs to that loop, not to the problem, so “a running sum is inherently sequential” turns out to be false.</p>
+
+<hr>
+
+<p>Associativity means (3 + 1) + (7 + 0) equals ((3 + 1) + 7) + 0, so we are free to regroup the additions into independent pairs. That freedom is all the parallel algorithms below rely on. An operation that produces every running combination of an array like this is called a <strong>scan</strong>, and it works with any associative operator: +, max, xor and others. In an <strong>inclusive</strong> scan, output j includes a[j]; in an <strong>exclusive</strong> scan, output j combines only the elements before j. In those terms, the prefix array from the previous section is the exclusive scan with the grand total added at the end.</p>
+
+<h2>Hillis-Steele: everyone adds at once</h2>
+<p>The first parallel scan here is the one Hillis and Steele published in 1986, as described in <em>GPU Gems 3</em>, chapter 39. It assumes one lane per element, and every lane follows the same rule at the same time:</p>
+<blockquote>Each cell adds the value <em>offset</em> places to its left. The offset starts at 1 and doubles every step: 1, 2, 4. A cell with nothing that far to its left keeps its value.</blockquote>
+<p>After each step, every cell’s sum reaches twice as far back as before, so three steps cover all eight elements. Each step reads from one row and writes into a fresh one, which is why the figure stacks rows: the algorithm keeps two buffers. Updating in place would let a cell read a neighbour that had already been overwritten in the same step, and it would get the wrong sum.</p>
+
+<figure>
+  <img src="https://jacksonkontny.github.io/prefix-sums/medium/img/hillis.png" alt="Hillis-Steele on [3, 1, 7, 0, 4, 1, 6, 3]. Step 1, offset 1, 7 adds: 3, 4, 8, 7, 4, 5, 7, 9. Step 2, offset 2, 6 adds: 3, 4, 11, 11, 12, 12, 11, 14. Step 3, offset 4, 4 adds: 3, 4, 11, 11, 15, 16, 22, 25, the inclusive scan. 3 steps, 17 adds." width="660">
+  <figcaption>Three steps, 17 adds (the sequential loop needs 7). The final row is the inclusive scan, prefix[1..8].</figcaption>
+</figure>
+
+<h3>Quick check 4 (predict)</h3>
+<p>Hillis-Steele took 3 steps for 8 elements (offsets 1, 2, 4). How many steps for 1,024 elements, assuming one lane per element?</p>
+<ul>
+  <li>A. 10</li>
+  <li>B. 32</li>
+  <li>C. 512</li>
+  <li>D. 1,023</li>
+</ul>
+<p><em>Pick one before reading on.</em></p>
+<p><strong>Answer: A.</strong> Each step doubles the offset, and the scan is done once the offset has covered the whole array: 1, 2, 4, …, 512 is 10 offsets, so log2(1,024) = 10 steps. The catch is in the other number: each step does almost n adds, so 10 steps cost 9,217 adds, against 1,023 for the plain loop. That is O(n log n) additions in total. (32 would be right if each step squared the reach instead of doubling it; 1,023 is the plain loop’s count, where each add waits on the last.)</p>
+
+<h2>Blelloch: sum up a tree, then hand the sums back down</h2>
+<p>Blelloch’s scan, from 1990 and again as described in <em>GPU Gems 3</em>, chapter 39, avoids those extra additions. It works on a single array in two phases, with a small reset in between.</p>
+<p><strong>Up-sweep.</strong> This is the pairwise trick from check 3, done in place: in each pair, the right element becomes L + R. The pairs are 1 apart, then 2, then 4. After three levels the last position holds the total of the whole array, and the other right-hand slots hold the totals of smaller groups along the way.</p>
+<p><strong>Clear.</strong> Save the total, because you will want it, then put 0 in the last position. Nothing comes before the whole array, so 0 is the right value to start handing down.</p>
+<p><strong>Down-sweep.</strong> The value arriving at a pair from above, its parent, is the sum of everything to the left of that pair’s group; in the in-place array, the parent’s value sits in the right slot of the pair. The left element takes the parent’s value. The right element takes the parent plus the left element’s old value, because the left half of the group sits between it and everything before. The pairs are 4 apart, then 2, then 1.</p>
+
+<h3>Quick check 5 (predict)</h3>
+<p>Partway through the down-sweep the row is [3, 0, 7, 4, 4, 11, 6, 16]. After the last step (stride 1), what will the array be?</p>
+<ul>
+  <li>A. [3, 4, 11, 11, 15, 16, 22, 25]</li>
+  <li>B. [0, 3, 4, 11, 11, 15, 16, 22]</li>
+  <li>C. [0, 0, 3, 4, 11, 11, 15, 16]</li>
+</ul>
+<p><em>Pick one, then check it against the full trace below.</em></p>
+
+<figure>
+  <img src="https://jacksonkontny.github.io/prefix-sums/medium/img/blelloch.png" alt="Blelloch on [3, 1, 7, 0, 4, 1, 6, 3]. Up-sweep strides 1, 2, 4 end with 25 in the last slot; clear saves 25 and puts 0 there; down-sweep strides 4, 2, 1 end with 0, 3, 4, 11, 11, 15, 16, 22, the exclusive scan, with the saved 25 as prefix[8]. 6 levels, 14 adds." width="660">
+  <figcaption>The full trace: three up-sweep levels, the clear, three down-sweep levels. 6 levels, 14 adds.</figcaption>
+</figure>
+
+<p><strong>Answer: B.</strong> Each pair (L, R) applies “L ← parent; R ← parent + old L”. For pair (4, 5), L gets 11 and R gets 11 + 4 = 15. Every position ends up holding the sum of everything <em>before</em> it: an exclusive scan. A is the tempting one, but it is Hillis-Steele’s inclusive answer, where each position includes itself, which is B shifted one place. C shifts twice.</p>
+<p>The final row is exactly the prefix array from the range-sum section, minus its last entry, and the total saved during the clear step is that last entry:</p>
+
+<figure>
+  <img src="https://jacksonkontny.github.io/prefix-sums/medium/img/compare.png" alt="Blelloch output 0, 3, 4, 11, 11, 15, 16, 22 plus the saved total 25, lined up above the prefix array 0, 3, 4, 11, 11, 15, 16, 22, 25. Every entry matches." width="660">
+  <figcaption>The exclusive scan is prefix[0..7]; the root value saved before it was cleared is prefix[8].</figcaption>
+</figure>
+
+<p>The cost: 14 additions in 6 levels, against Hillis-Steele’s 17 additions in 3 steps. In general Blelloch does 2·(n − 1) additions (plus n − 1 swaps), which is O(n), the same order as the plain loop. That is why it is called <em>work-efficient</em>: its total additions, its work, grow like the plain loop’s. The price is about 2·log2(n) levels instead of log2(n).</p>
+<p><strong>Why does the down-sweep work?</strong> Follow position 5 through the last step. It is the R of pair (4, 5). The 11 sitting there came down from its parent, and it is the sum of everything to the left of this pair: 3 + 1 + 7 + 0. Position 4 (L) simply takes that 11, which is everything before position 4. Position 5 adds the old L value, 4, to get 15 = 3 + 1 + 7 + 0 + 4, which is everything before position 5. The same holds at every level: a parent’s value is “everything left of my group”, and each child gets “everything left of me”.</p>
+
+<h2>Fewer steps isn’t faster: work vs. span</h2>
+<p>You have now counted two different things for each algorithm, and they deserve names. <strong>Span</strong> is the number of steps if lanes were unlimited: the loop’s 7, Hillis-Steele’s 3, Blelloch’s 6. <strong>Work</strong> is the total number of additions: 7, 17 and 14. At n = 8 the difference in work looks small. Here is how it grows.</p>
+
+<figure>
+  <img src="https://jacksonkontny.github.io/prefix-sums/medium/img/table.png" alt="Total additions. n = 8: sequential 7, Hillis-Steele 17, Blelloch 14. n = 1,024: 1,023, 9,217, 2,046. n = 2^20: about 1.05M, 19.9M, 2.1M." width="660">
+  <figcaption>Total additions, counted from each algorithm’s definition (n·log2(n) − (n − 1) for Hillis-Steele, 2·(n − 1) for Blelloch), not measured on hardware.</figcaption>
+</figure>
+
+<p>Hillis-Steele has the smallest span, log2(n), and the largest work, a factor of about log2(n) more than the loop. Which of the two numbers decides the running time depends on how many lanes you actually have.</p>
+
+<h3>Quick check 6 (predict)</h3>
+<p>You scan a million floats on a CPU with 8 AVX lanes. Rank the plain loop, Hillis-Steele, and Blelloch from fastest to slowest (by rounds of adds, ignoring memory).</p>
+<ul>
+  <li>A. Hillis-Steele, Blelloch, loop: fewest steps wins</li>
+  <li>B. Blelloch, Hillis-Steele, loop</li>
+  <li>C. Blelloch, loop, Hillis-Steele</li>
+  <li>D. All about the same</li>
+</ul>
+<p><em>Pick one before reading on.</em></p>
+<p><strong>Answer: C.</strong> With 8 lanes, each round does at most 8 adds, so time is roughly work ÷ 8. Hillis-Steele does ~19.9M adds, so ~2.5M rounds: worse than the loop’s ~1.05M. Blelloch does ~2.1M adds, so ~262k rounds, about 4× fewer rounds than the loop. A is the tempting answer, because step count is the number everyone quotes, but Hillis-Steele’s “only 20 steps” assumes a million lanes. Fewer steps wins only when lanes ≥ elements.</p>
+
+<figure>
+  <img src="https://jacksonkontny.github.io/prefix-sums/medium/img/race-avx.png" alt="A million floats on 8 AVX2 lanes: plain loop 1,048,575 rounds, Hillis-Steele 2,490,369 rounds, Blelloch 262,148 rounds. Blelloch wins." width="660">
+  <figcaption>A million values on 8 lanes: Blelloch wins, and Hillis-Steele even loses to the plain loop.</figcaption>
+</figure>
+
+<figure>
+  <img src="https://jacksonkontny.github.io/prefix-sums/medium/img/race-warp.png" alt="One 32-thread warp scanning 32 values: plain loop 31 rounds, Hillis-Steele 5 rounds, Blelloch 10 rounds. Hillis-Steele wins." width="660">
+  <figcaption>One 32-thread warp scanning 32 values: now Hillis-Steele wins. Both charts use a rounds = adds ÷ lanes model, not a benchmark; it ignores memory traffic.</figcaption>
+</figure>
+
+<p><strong>Rule of thumb, in this adds-per-round model.</strong> When you have at least as many lanes as elements, as when one 32-thread warp scans 32 values, Hillis-Steele’s fewer steps win and its extra adds ride on lanes that would otherwise sit idle. When elements vastly outnumber lanes, as with a million floats on 8 AVX lanes, every add costs a lane-slot, and Blelloch’s smaller work wins.</p>
+
+<h2>Back to O(1)</h2>
+<p>Time to put the two halves together. A GPU running Blelloch’s scan hands you back an array and one saved number. Here is what they are good for.</p>
+
+<h3>Quick check 7 (apply)</h3>
+<p>A GPU just ran Blelloch on [3, 1, 7, 0, 4, 1, 6, 3] and returned [0, 3, 4, 11, 11, 15, 16, 22], plus the saved total 25. What is sum(2..5), and which two entries give it?</p>
+<ul>
+  <li>A. 12 = 16 − 4</li>
+  <li>B. 11 = 15 − 4</li>
+  <li>C. 13 = 16 − 3</li>
+  <li>D. 8 = 11 − 3</li>
+</ul>
+<p><em>Pick one before reading on.</em></p>
+<p><strong>Answer: A.</strong> Blelloch’s output is prefix[0..7] and 25 is prefix[8], so sum(2..5) = prefix[6] − prefix[2] = 16 − 4 = 12 (= 7 + 0 + 4 + 1). B uses prefix[5], which is “everything before 5” and so drops a[5]: that’s the j versus j + 1 slip. C starts one too early: 16 − 3 = prefix[6] − prefix[1] = sum(1..5), which includes a[1]. D uses the wrong entries at both ends.</p>
+
+<h3>Recap</h3>
+<ul>
+  <li>Build the prefix array once, with a plain O(n) loop or a parallel scan, and any range sum is prefix[j+1] − prefix[i] in O(1), with no special case at i = 0.</li>
+  <li>The subtraction trick needs an operation you can undo: + and xor, not max.</li>
+  <li>Hillis-Steele takes the fewest steps, log2(n), but does O(n log n) work: best when lanes ≥ elements.</li>
+  <li>Blelloch does O(n) work in about 2·log2(n) levels: best, counting adds per round, when elements far outnumber lanes.</li>
+</ul>
+<p><strong>Where next.</strong> If values change after the build, look at Fenwick trees, which avoid the full rebuild; and arrays too large for one pass are scanned in blocks. Real CPU code combines Hillis-Steele with the plain loop: it scans each 8-lane register with Hillis-Steele (there, lanes = elements) and carries the running total from block to block, one block after another. Once the array outgrows the cache, memory bandwidth, not additions, sets the speed.</p>
+<p>Want to step through the scans yourself? The <a href="https://jacksonkontny.github.io/prefix-sums/">interactive version</a> has all four figures live.</p>
+
+<h3>Sources</h3>
+<ul>
+  <li><a href="https://developer.nvidia.com/gpugems/gpugems3/part-vi-gpu-computing/chapter-39-parallel-prefix-sum-scan-cuda"><em>GPU Gems 3</em>, chapter 39: Parallel Prefix Sum (Scan) with CUDA</a>. Source for both algorithms’ descriptions and their add counts. It credits W. D. Hillis and G. L. Steele Jr., “Data Parallel Algorithms”, <em>Communications of the ACM</em>, 1986, and G. E. Blelloch, “Prefix Sums and Their Applications”, CMU-CS-90-190, 1990 (both cited here via GPU Gems).</li>
+  <li><a href="https://en.wikipedia.org/wiki/Prefix_sum">Wikipedia: Prefix sum</a>, for Hillis-Steele’s step count.</li>
+  <li><a href="https://usaco.guide/silver/prefix-sums">USACO Guide: Prefix Sums</a>, for the range-sum identity and its O(1) queries.</li>
+  <li><a href="https://cp-algorithms.com/data_structures/fenwick.html">cp-algorithms: Fenwick Tree</a>, for why min and max have no inverse.</li>
+  <li><a href="https://numpy.org/doc/stable/reference/generated/numpy.cumsum.html">NumPy documentation: numpy.cumsum</a>.</li>
+  <li><a href="https://en.wikipedia.org/wiki/Advanced_Vector_Extensions">Wikipedia: Advanced Vector Extensions</a>, for AVX register widths and lane counts.</li>
+  <li><a href="https://en.algorithmica.org/hpc/algorithms/prefix/">Algorithmica: Prefix Sum with SIMD</a>, for in-register scans with carried block totals and the memory-bandwidth limit on large arrays.</li>
+  <li><a href="https://developer.nvidia.com/blog/using-cuda-warp-level-primitives/">NVIDIA Technical Blog: Using CUDA Warp-Level Primitives</a>, for 32-thread warps and SIMT.</li>
+</ul>
+<p><em>Worked numbers (the five-element example, the eight-element traces, and the add and round counts) were computed for this piece, not quoted.</em></p>
+
+</article>
+</body>
+</html>
